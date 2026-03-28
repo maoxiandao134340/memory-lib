@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🧠 记忆库</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #333; line-height: 1.6; }
+    .container { max-width: 800px; margin: 0 auto; padding: 20px; }
+    h1 { text-align: center; color: #4a90d9; margin-bottom: 20px; }
+    
+    .stats { background: white; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; justify-content: space-around; flex-wrap: wrap; }
+    .stat-item { text-align: center; }
+    .stat-value { font-size: 24px; font-weight: bold; color: #4a90d9; }
+    .stat-label { font-size: 12px; color: #666; }
+    
+    .form { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+    .form-group { margin-bottom: 15px; }
+    label { display: block; margin-bottom: 5px; font-weight: 500; }
+    input, textarea, select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
+    textarea { min-height: 80px; resize: vertical; }
+    button { background: #4a90d9; color: white; border: none; padding: 12px 24px; border-radius: 4px; cursor: pointer; font-size: 16px; }
+    button:hover { background: #357abd; }
+    
+    .filters { background: white; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
+    .filters select, .filters input { flex: 1; min-width: 100px; }
+    
+    .memories { display: flex; flex-direction: column; gap: 15px; }
+    .memory { background: white; padding: 20px; border-radius: 8px; border-left: 4px solid #4a90d9; }
+    .memory-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .memory-category { background: #e8f4fd; color: #4a90d9; padding: 4px 8px; border-radius: 4px; font-size: 12px; }
+    .memory-tags { margin: 10px 0; }
+    .memory-tag { background: #f0f0f0; padding: 2px 8px; border-radius: 4px; font-size: 12px; margin-right: 5px; }
+    .memory-content { margin: 10px 0; white-space: pre-wrap; }
+    .memory-meta { font-size: 12px; color: #999; }
+    .memory-actions { margin-top: 10px; }
+    .memory-actions button { padding: 6px 12px; font-size: 12px; margin-right: 5px; }
+    .btn-delete { background: #d9534f; }
+    .btn-delete:hover { background: #c9302c; }
+    .btn-edit { background: #5bc0de; }
+    .btn-edit:hover { background: #31b0d5; }
+    
+    .empty { text-align: center; color: #999; padding: 40px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🧠 记忆库</h1>
+    
+    <div class="stats" id="stats">
+      <div class="stat-item"><div class="stat-value" id="totalCount">0</div><div class="stat-label">总记忆</div></div>
+      <div class="stat-item"><div class="stat-value" id="deepCount">0</div><div class="stat-label">深层</div></div>
+      <div class="stat-item"><div class="stat-value" id="dailyCount">0</div><div class="stat-label">日常</div></div>
+      <div class="stat-item"><div class="stat-value" id="diaryCount">0</div><div class="stat-label">日记</div></div>
+      <div class="stat-item"><div class="stat-value" id="writeCount">0</div><div class="stat-label">写文</div></div>
+    </div>
+    
+    <div class="form">
+      <h3 id="formTitle">添加新记忆</h3>
+      <div class="form-group">
+        <label>内容</label>
+        <textarea id="content" placeholder="输入记忆内容..."></textarea>
+      </div>
+      <div class="form-group">
+        <label>分类</label>
+        <select id="category">
+          <option value="日常">日常</option>
+          <option value="深层">深层</option>
+          <option value="日记">日记</option>
+          <option value="写文">写文</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>标签（逗号分隔）</label>
+        <input id="tags" placeholder="标签1, 标签2">
+      </div>
+      <div class="form-group">
+        <label>来源</label>
+        <input id="source" placeholder="来源（可选）">
+      </div>
+      <input type="hidden" id="editId">
+      <button id="submitBtn" onclick="submitMemory()">添加</button>
+      <button id="cancelBtn" onclick="cancelEdit()" style="display:none; background:#999; margin-left:10px;">取消</button>
+    </div>
+    
+    <div class="filters">
+      <select id="filterCategory" onchange="loadMemories()">
+        <option value="">全部分类</option>
+        <option value="深层">深层</option>
+        <option value="日常">日常</option>
+        <option value="日记">日记</option>
+        <option value="写文">写文</option>
+      </select>
+      <input id="filterTag" placeholder="按标签筛选" oninput="loadMemories()">
+      <input id="filterKeyword" placeholder="关键词搜索" oninput="loadMemories()">
+    </div>
+    
+    <div class="memories" id="memories"></div>
+  </div>
+  
+  <script>
+    const API = '';
+    
+    async function loadStats() {
+      try {
+        const res = await fetch(`${API}/api/stats`);
+        const data = await res.json();
+        document.getElementById('totalCount').textContent = data.total;
+        document.getElementById('deepCount').textContent = data.byCategory['深层'] || 0;
+        document.getElementById('dailyCount').textContent = data.byCategory['日常'] || 0;
+        document.getElementById('diaryCount').textContent = data.byCategory['日记'] || 0;
+        document.getElementById('writeCount').textContent = data.byCategory['写文'] || 0;
+      } catch (e) { console.error('加载统计失败:', e); }
+    }
+    
+    async function loadMemories() {
+      const category = document.getElementById('filterCategory').value;
+      const tag = document.getElementById('filterTag').value;
+      const keyword = document.getElementById('filterKeyword').value;
+      
+      let url = `${API}/api/memories?`;
+      if (category) url += `category=${encodeURIComponent(category)}&`;
+      if (tag) url += `tag=${encodeURIComponent(tag)}&`;
+      if (keyword) url += `keyword=${encodeURIComponent(keyword)}&`;
+      
+      try {
+        const res = await fetch(url);
+        const memories = await res.json();
+        renderMemories(memories);
+      } catch (e) { console.error('加载记忆失败:', e); }
+    }
+    
+    function renderMemories(memories) {
+      const container = document.getElementById('memories');
+      if (!memories.length) {
+        container.innerHTML = '<div class="empty">暂无记忆</div>';
+        return;
+      }
+      
+      container.innerHTML = memories.map(m => `
+        <div class="memory">
+          <div class="memory-header">
+            <span class="memory-category">${m.category}</span>
+            <span class="memory-meta">${new Date(m.timestamp).toLocaleString('zh-CN')}</span>
+          </div>
+          <div class="memory-content">${escapeHtml(m.content)}</div>
+          ${m.tags.length ? `<div class="memory-tags">${m.tags.map(t => `<span class="memory-tag">${escapeHtml(t)}</span>`).join('')}</div>` : ''}
+          ${m.source ? `<div class="memory-meta">来源: ${escapeHtml(m.source)}</div>` : ''}
+          <div class="memory-actions">
+            <button class="btn-edit" onclick="editMemory('${m.id}', '${escapeHtml(m.content).replace(/'/g, "\\'")}', '${m.category}', '${m.tags.join(',')}', '${escapeHtml(m.source || '').replace(/'/g, "\\'")}')">编辑</button>
+            <button class="btn-delete" onclick="deleteMemory('${m.id}')">删除</button>
+          </div>
+        </div>
+      `).join('');
+    }
+    
+    function escapeHtml(text) {
+      return text.replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>').replace(/"/g, '"');
+    }
+    
+    async function submitMemory() {
+      const id = document.getElementById('editId').value;
+      const content = document.getElementById('content').value;
+      const category = document.getElementById('category').value;
+      const tags = document.getElementById('tags').value.split(',').map(t => t.trim()).filter(t => t);
+      const source = document.getElementById('source').value;
+      
+      if (!content) return alert('请输入内容');
+      
+      const url = id ? `${API}/api/memories/${id}` : `${API}/api/memories`;
+      const method = id ? 'PUT' : 'POST';
+      
+      try {
+        await fetch(url, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content, category, tags, source })
+        });
+        cancelEdit();
+        loadMemories();
+        loadStats();
+      } catch (e) { alert('保存失败'); }
+    }
+    
+    function editMemory(id, content, category, tags, source) {
+      document.getElementById('editId').value = id;
+      document.getElementById('content').value = content;
+      document.getElementById('category').value = category;
+      document.getElementById('tags').value = tags;
+      document.getElementById('source').value = source;
+      document.getElementById('formTitle').textContent = '编辑记忆';
+      document.getElementById('submitBtn').textContent = '保存';
+      document.getElementById('cancelBtn').style.display = 'inline-block';
+      window.scrollTo(0, 0);
+    }
+    
+    function cancelEdit() {
+      document.getElementById('editId').value = '';
+      document.getElementById('content').value = '';
+      document.getElementById('category').value = '日常';
+      document.getElementById('tags').value = '';
+      document.getElementById('source').value = '';
+      document.getElementById('formTitle').textContent = '添加新记忆';
+      document.getElementById('submitBtn').textContent = '添加';
+      document.getElementById('cancelBtn').style.display = 'none';
+    }
+    
+    async function deleteMemory(id) {
+      if (!confirm('确定删除这条记忆吗？')) return;
+      try {
+        await fetch(`${API}/api/memories/${id}`, { method: 'DELETE' });
+        loadMemories();
+        loadStats();
+      } catch (e) { alert('删除失败'); }
+    }
+    
+    loadStats();
+    loadMemories();
+  </script>
+</body>
+</html>
